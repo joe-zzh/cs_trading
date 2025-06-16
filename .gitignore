@@ -9,7 +9,7 @@ __pycache__/
 .env
 
 # 数据和结果
-/data/raw/
+/data/
 /results/
 /plot/
 /logs/
