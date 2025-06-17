@@ -4,6 +4,10 @@ from dotenv import load_dotenv
 import yaml
 from src.utils.llm_client import LLMClient
 from src.agents.trend_agent import analyze_market_trend
+from src.tools.compare_analyzer import compare_market_trends
+from src.agents.tools_registry import get_tools
+from langchain.agents import initialize_agent, AgentType
+from langchain.chat_models import ChatOpenAI
 
 load_dotenv()
 api_key = os.getenv("API_KEY")
@@ -12,10 +16,16 @@ with open("config/config.yaml", "r", encoding="utf-8") as f:
     config = yaml.safe_load(f)
 llm_cfg = config["llm_api"]
 
-llm = LLMClient(
-    api_url=llm_cfg["api_url"],
-    api_key=api_key,
-    model=llm_cfg["model"]
+# 初始化LLM和工具
+llm = ChatOpenAI(temperature=0, model=llm_cfg["model"])
+tools = get_tools()
+
+# 初始化Agent
+agent = initialize_agent(
+    tools,
+    llm,
+    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    verbose=True
 )
 
 @cl.on_chat_start
@@ -27,23 +37,9 @@ def start_chat():
 @cl.on_message
 async def main(message: cl.Message):
     user_input = message.content
-    message_history = cl.user_session.get("message_history")
-
-    # 简单关键词判断，自动调用本地分析
-    if ("分析" in user_input) and ("大盘" in user_input or "板块" in user_input):
-        # 提取市场名，默认支持"分析大盘"或"分析XX板块"
-        if "大盘" in user_input:
-            market_name = "大盘"
-        else:
-            # 尝试提取"XX板块"
-            import re
-            match = re.search(r"分析(.+?)板块", user_input)
-            market_name = match.group(1) + "板块" if match else "板块"
-        answer = analyze_market_trend(market_name)
-    else:
-        message_history.append({"role": "user", "content": user_input})
-        result = llm.chat(message_history)
-        answer = result["choices"][0]["message"]["content"]
-        message_history.append({"role": "assistant", "content": answer})
-
-    await cl.Message(content=answer).send() 
+    # 由Agent自动选择工具并应答
+    try:
+        response = agent.run(user_input)
+        await cl.Message(content=response).send()
+    except Exception as e:
+        await cl.Message(content=f"出错: {e}").send() 

@@ -27,8 +27,8 @@ logging:
   file: "logs/app.log"
 
 llm_api:
-  api_url: "https://api.siliconflow.cn/v1/chat/completions"
-  model: "Qwen/QwQ-32B"
+  api_url: "https://api.siliconflow.cn/v1"
+  model: "Qwen/Qwen2.5-7B-Instruct"
   max_tokens: 1024
   temperature: 0.7
   top_p: 0.7
